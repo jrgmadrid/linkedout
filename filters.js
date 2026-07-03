@@ -10,6 +10,8 @@ const DP_FILTERS = [
   { key: 'reposts',   label: 'Reposts',             hint: '"Jane Doe reposted this"',      reasonLabel: 'Repost',             pattern: /\breposted/,                                                 enabled: false },
   { key: 'follows',   label: 'Follow spillover',    hint: '"Jane Doe follows Acme Corp"',  reasonLabel: 'Follow spillover',   pattern: /\bfollows/,                                                  enabled: false },
   { key: 'suggested', label: 'Suggested posts',     hint: '"Recommended for you"',         reasonLabel: 'Suggested post',     pattern: /suggested for you|recommended for you/i,                    enabled: false },
+  // Rail widgets, not feed posts: hidden outright by sweepWidgets(), no placeholder.
+  { key: 'railwidgets', label: 'News & games',      hint: '"LinkedIn News", "Today’s puzzles"', reasonLabel: 'News & games', pattern: null,                                                 enabled: false },
 ];
 
 const DP_DEFAULTS = Object.fromEntries(DP_FILTERS.map((f) => [f.key, f.enabled]));

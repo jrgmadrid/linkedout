@@ -8,6 +8,10 @@
   display: none;
 }
 
+html[data-dp-hide~="railwidgets"] [data-dp-widget] {
+  display: none !important;
+}
+
 /* No background/border of its own: the placeholder sits inside LinkedIn's
    post card and inherits that chrome, so it doesn't render card-in-card. */
 .dp-placeholder {

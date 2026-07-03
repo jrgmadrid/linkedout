@@ -137,7 +137,27 @@ function classify(post) {
   return { reasons, who };
 }
 
+// Rail widgets (LinkedIn News, Today's puzzles) live in the right-hand aside:
+// each widget card is a grandchild of the aside, so from the heading we climb
+// until the parent's parent is the aside. If the structure shifts and we hit
+// the aside's direct child instead, that wrapper holds exactly these widgets,
+// so marking it is an acceptable fallback.
+const RAIL_WIDGET_HEADING = /^(LinkedIn News|Today['’]s (?:puzzles|games))$/i;
+
+function sweepWidgets() {
+  for (const el of document.querySelectorAll('aside p, aside h2, aside h3')) {
+    if (el.childElementCount || !RAIL_WIDGET_HEADING.test(el.textContent.trim())) continue;
+    const aside = el.closest('aside');
+    let node = el;
+    while (node.parentElement !== aside && node.parentElement.parentElement !== aside) {
+      node = node.parentElement;
+    }
+    node.dataset.dpWidget = '1';
+  }
+}
+
 function sweep() {
+  sweepWidgets();
   for (const post of document.querySelectorAll(POST_SELECTOR)) {
     if (post.dataset.dpChecked) continue;
     // Hydration gate: every fully-rendered post carries an "Open control menu

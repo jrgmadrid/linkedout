@@ -41,6 +41,35 @@ function testidCensus() {
   );
 }
 
+// Rail widgets (LinkedIn News, games) aren't feed posts — find their heading
+// text and walk up the ancestor chain to reveal the widget container.
+const WIDGET_HEADING = /^(LinkedIn News|Today['’]s (?:puzzles|games)|Games|Puzzles)$/i;
+
+function dpChainUp(el, depth = 10) {
+  const chain = [];
+  let node = el;
+  while (node && node !== document.body && chain.length < depth) {
+    chain.push({
+      tag: node.tagName.toLowerCase(),
+      attrs: Object.fromEntries([...node.attributes].map((a) => [a.name, a.value.slice(0, 160)])),
+      childCount: node.childElementCount,
+    });
+    node = node.parentElement;
+  }
+  return chain;
+}
+
+function dpWidgetChains() {
+  const hits = [];
+  for (const el of document.querySelectorAll('h1, h2, h3, h4, span, p, div, a')) {
+    if (el.childElementCount === 0 && WIDGET_HEADING.test(el.textContent.trim())) {
+      hits.push({ text: el.textContent.trim(), chain: dpChainUp(el) });
+      if (hits.length >= 8) break;
+    }
+  }
+  return hits;
+}
+
 function dpHarvest() {
   const items = [...document.querySelectorAll('div[role="listitem"]')];
   const payload = {
@@ -48,13 +77,14 @@ function dpHarvest() {
     collectedAt: new Date().toISOString(),
     listItemCount: items.length,
     testidCensus: testidCensus(),
+    widgetChains: dpWidgetChains(),
     posts: items.map(harvestListItem),
   };
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'li-feed-markers-v3.json';
+  link.download = 'li-feed-markers-v4.json';
   link.click();
   URL.revokeObjectURL(link.href);
 
