@@ -43,6 +43,17 @@ const EYE_OFF_ICON = `
     <line x1="1" y1="1" x2="23" y2="23"/>
   </svg>`;
 
+// The author's name comes from the control-menu accessibility label, which
+// every post type carries (and which the hydration gate in sweep() already
+// requires). It names the post's author, not the connection whose reaction
+// surfaced it.
+const AUTHOR_LABEL_PREFIX = 'Open control menu for post by ';
+
+function postAuthor(post) {
+  const el = post.querySelector(`[aria-label^="${AUTHOR_LABEL_PREFIX}"]`);
+  return el ? el.getAttribute('aria-label').slice(AUTHOR_LABEL_PREFIX.length).trim() : null;
+}
+
 function buildPlaceholder(post, reasons) {
   const box = document.createElement('div');
   box.className = 'dp-placeholder';
@@ -54,9 +65,12 @@ function buildPlaceholder(post, reasons) {
 
   const title = box.querySelector('.dp-title');
   const button = box.querySelector('button');
+  const author = postAuthor(post);
   const sync = () => {
     const revealed = 'dpRevealed' in post.dataset;
-    title.textContent = revealed ? 'Post shown' : 'Hidden post';
+    title.textContent = revealed
+      ? 'Post shown'
+      : author ? `Hidden post from ${author}` : 'Hidden post';
     button.textContent = revealed ? 'Hide' : 'Show';
   };
   sync();

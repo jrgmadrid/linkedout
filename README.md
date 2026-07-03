@@ -1,8 +1,5 @@
 # Better LinkedIn
 
-> Working title. Formerly "LinkedIn De-Promoter" — renamed when the scope grew
-> beyond ad-blocking (spillover filters, repost detection, more coming).
-
 Chrome extension (Manifest V3) that hides promoted posts, social-graph noise,
 and reposts from the LinkedIn feed. Filtered posts collapse into a native-
 looking "Hidden post" card showing the reason, with a per-post **Show**
