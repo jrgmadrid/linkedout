@@ -101,8 +101,6 @@ for (const box of document.querySelectorAll('input[data-group-keys]')) {
   });
 }
 
-const status = document.getElementById('harvest-status');
-
 // The worker's onInstalled listener refreshes LinkedIn tabs once the new
 // version boots, so this one call is the whole dev loop.
 document.getElementById('reload').addEventListener('click', () => {
@@ -111,14 +109,4 @@ document.getElementById('reload').addEventListener('click', () => {
 
 document.getElementById('judge-cfg').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
-});
-
-document.getElementById('harvest').addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  try {
-    const res = await chrome.tabs.sendMessage(tab.id, DP_HARVEST_MSG);
-    status.textContent = `${res.count} posts exported`;
-  } catch {
-    status.textContent = 'Open a LinkedIn feed tab first';
-  }
 });

@@ -17,6 +17,11 @@
       font-size: 15px;
       font-weight: 600;
     }
+    h1.section {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #e6eaef;
+    }
     p.lede {
       margin: 0 0 18px;
       color: #5b6772;
@@ -107,6 +112,17 @@
     <button id="save" class="primary">Save</button>
     <button id="test">Test the judge</button>
     <span id="status"></span>
+  </div>
+
+  <h1 class="section">Maintenance</h1>
+  <p class="lede">When LinkedIn shuffles its DOM and a filter quietly stops
+  matching, export fresh feed markers and re-tune the selectors against
+  them. Dumps a JSON of the current feed's structure to Downloads; post
+  text stays on your machine.</p>
+
+  <div class="actions">
+    <button id="harvest">Export feed markers</button>
+    <span id="harvest-status"></span>
   </div>
 
   <script src="filters.js"></script>

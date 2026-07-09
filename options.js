@@ -27,6 +27,24 @@ document.getElementById('save').addEventListener('click', () => {
   status.textContent = 'Saved.';
 });
 
+// The options page floats over chrome://extensions, so "the active tab" is
+// never LinkedIn — find a LinkedIn tab explicitly (host permission granted).
+const harvestStatus = document.getElementById('harvest-status');
+document.getElementById('harvest').addEventListener('click', async () => {
+  const tabs = await chrome.tabs.query({ url: 'https://www.linkedin.com/*' });
+  const tab = tabs.find((t) => t.active) || tabs[0];
+  if (!tab) {
+    harvestStatus.textContent = 'Open a LinkedIn feed tab first.';
+    return;
+  }
+  try {
+    const res = await chrome.tabs.sendMessage(tab.id, DP_HARVEST_MSG);
+    harvestStatus.textContent = `${res.count} posts exported.`;
+  } catch {
+    harvestStatus.textContent = 'That LinkedIn tab needs a refresh first.';
+  }
+});
+
 // One real judge call on a canned slop snippet — fail-open hides broken
 // keys everywhere else, so this is the only place errors get to speak.
 document.getElementById('test').addEventListener('click', async () => {
