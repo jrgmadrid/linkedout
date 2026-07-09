@@ -58,10 +58,13 @@ function postAuthor(post) {
   return el ? el.getAttribute('aria-label').slice(AUTHOR_LABEL_PREFIX.length).trim() : null;
 }
 
-function buildPlaceholder(post, reasons) {
+const reasonLabels = (keys) =>
+  keys.map((k) => REASON_LABEL_MAP[k]).filter(Boolean).join(', ');
+
+function buildPlaceholder(post, keys) {
   const box = document.createElement('div');
   box.className = 'dp-placeholder';
-  const labels = reasons.map((r) => REASON_LABEL_MAP[r]).filter(Boolean).join(', ');
+  const labels = reasonLabels(keys);
   box.innerHTML = `
     ${EYE_OFF_ICON}
     <span class="dp-placeholder-text"><span class="dp-title"></span><small>${labels}</small></span>
@@ -115,9 +118,22 @@ function headSegment(post) {
 const BARE_REPOST_PATTERN =
   /\d+\s?(?:min|h|d|w|mo|yr)\b\s*•\s*(?:Edited\s*•\s*)?.{0,45}?\s?\d+\s?(?:min|h|d|w|mo|yr)\b/;
 
+// Both repost detectors key on the embed signature: a second "Visibility:"
+// disclosure means a post nested inside a post.
+const hasEmbeddedRepost = (post) =>
+  post.querySelectorAll('[aria-label^="Visibility:"]').length >= 2;
+
 function isBareRepost(post) {
-  if (post.querySelectorAll('[aria-label^="Visibility:"]').length < 2) return false;
+  if (!hasEmbeddedRepost(post)) return false;
   return BARE_REPOST_PATTERN.test(post.textContent.replace(/\s+/g, ' ').slice(0, 400));
+}
+
+// Fig-leaf reposts: an embedded original whose outer commentary is a generic
+// reaction — "Couldn't agree more with this take." postBody() returns the
+// outer commentary box on quote-reposts (first match wins), which is exactly
+// the text being judged here.
+function isFigleafRepost(post) {
+  return hasEmbeddedRepost(post) && isFigleafCommentary(postBody(post));
 }
 
 // Returns reasons plus `who`: for spillover posts, the connection whose
@@ -138,6 +154,7 @@ function classify(post) {
     if (who === null) who = head.slice(0, m.index).trim() || null;
   }
   if (!reasons.includes('reposts') && isBareRepost(post)) reasons.push('reposts');
+  if (!reasons.includes('reposts') && isFigleafRepost(post)) reasons.push('figleaf');
   return { reasons, who };
 }
 
@@ -181,7 +198,9 @@ function postIdentity(post) {
 // second opinion: the judge can certify (adds the filled chip) or clear the
 // heuristic chips outright — that's the safety net for sincere posts that
 // merely look like slop. ≥70 is a final local conviction; <40 is never
-// judged, so its chips stand unappealed (accepted trade, see spec).
+// judged, so its chips stand unappealed (accepted trade, see spec) — unless
+// promo-suspected (spec R9), which widens the trigger below the band so the
+// judge can mint the promotion chip regex isn't allowed to.
 const SLOP_LIKELY = 70;
 const SLOP_AMBIGUOUS = 40;
 const JUDGE_CERTIFIED = 60;
@@ -193,8 +212,43 @@ const slopReceipt = (offenses) => offenses
   .map((o) => (o.detail ? `${o.label} (${o.detail})` : o.label))
   .join('; ');
 
+const slopFams = (post) => (post.dataset.dpSlopFams || '').split(' ').filter(Boolean);
+
+// The placeholder is the single statement of every reason a post can be
+// hidden: hide-filter reasons plus slop chips (spec R10). Built on first
+// need, labels refreshed as verdicts change; the reveal button reads live
+// post state, so a label update never touches it.
+function syncPlaceholder(post) {
+  const keys = (post.dataset.dpReasons || '').split(' ').filter(Boolean).concat(slopFams(post));
+  if ('dpSlopCertified' in post.dataset) keys.push('certified');
+  const ph = post.querySelector(':scope > .dp-placeholder');
+  if (!keys.length) {
+    if (ph) ph.remove();
+  } else if (!ph) {
+    post.prepend(buildPlaceholder(post, keys));
+  } else {
+    ph.querySelector('small').textContent = reasonLabels(keys);
+  }
+}
+
+function slopChip(fam, label, title) {
+  const chip = document.createElement('span');
+  chip.className = 'dp-slop-chip';
+  chip.dataset.fam = fam;
+  chip.textContent = label;
+  chip.title = title;
+  return chip;
+}
+
 function syncSlopChips(post) {
+  const fams = slopFams(post);
+  const certified = 'dpSlopCertified' in post.dataset;
   let box = post.querySelector(':scope > .dp-slop-badge');
+  if (!fams.length && !certified) {
+    if (box) box.remove();
+    syncPlaceholder(post);
+    return;
+  }
   if (!box) {
     box = document.createElement('span');
     box.className = 'dp-slop-badge';
@@ -202,22 +256,13 @@ function syncSlopChips(post) {
   }
   box.textContent = '';
   const why = JSON.parse(post.dataset.dpSlopWhy || '{}');
-  for (const fam of (post.dataset.dpSlopFams || '').split(' ').filter(Boolean)) {
-    const chip = document.createElement('span');
-    chip.className = 'dp-slop-chip';
-    chip.dataset.fam = fam;
-    chip.textContent = SLOP_FAMILY_LABEL[fam];
-    chip.title = why[fam] || '';
-    box.appendChild(chip);
+  for (const fam of fams) {
+    box.appendChild(slopChip(fam, SLOP_FAMILY_LABEL[fam], why[fam] || ''));
   }
-  if ('dpSlopCertified' in post.dataset) {
-    const chip = document.createElement('span');
-    chip.className = 'dp-slop-chip';
-    chip.dataset.fam = 'certified';
-    chip.textContent = 'Certified slop';
-    chip.title = post.dataset.dpSlopJudgeWhy || '';
-    box.appendChild(chip);
+  if (certified) {
+    box.appendChild(slopChip('certified', 'Certified slop', post.dataset.dpSlopJudgeWhy || ''));
   }
+  syncPlaceholder(post);
 }
 
 function applySlopFamilies(post, families) {
@@ -228,20 +273,38 @@ function applySlopFamilies(post, families) {
   syncSlopChips(post);
 }
 
-function certifySlop(post, offenses) {
-  post.dataset.dpSlopCertified = '1';
-  post.dataset.dpSlopJudgeWhy = slopReceipt(offenses);
-  if (!post.dataset.dpSlopFams) post.dataset.dpSlopFams = '';
-  syncSlopChips(post);
-}
+// One declarative application per verdict — the final chip state is computed
+// here, not choreographed across helpers. A clear (<40) wipes the heuristic
+// chips but never the promotion chip: the two verdicts are orthogonal (spec
+// R9), a well-written stealth ad keeps its low score and wears the chip
+// anyway. The badge box's visibility CSS keys on data-dp-slop-fams existing,
+// so a certified post keeps the attribute even when its family list is empty.
+function applyJudgeVerdict(post, { score, offenses }) {
+  const promo = offenses.filter((o) => o.family === 'promotion');
+  let fams = slopFams(post);
+  let why = JSON.parse(post.dataset.dpSlopWhy || '{}');
 
-function clearSlop(post) {
-  delete post.dataset.dpSlopFams;
-  delete post.dataset.dpSlopWhy;
-  delete post.dataset.dpSlopCertified;
-  delete post.dataset.dpSlopJudgeWhy;
-  const box = post.querySelector(':scope > .dp-slop-badge');
-  if (box) box.remove();
+  if (score < JUDGE_CLEAR) {
+    fams = [];
+    why = {};
+  }
+  if (promo.length && !fams.includes('promotion')) {
+    fams.push('promotion');
+    why.promotion = slopReceipt(promo);
+  }
+  if (score >= JUDGE_CERTIFIED) {
+    post.dataset.dpSlopCertified = '1';
+    post.dataset.dpSlopJudgeWhy = slopReceipt(offenses);
+  }
+
+  if (fams.length || 'dpSlopCertified' in post.dataset) {
+    post.dataset.dpSlopFams = fams.join(' ');
+    post.dataset.dpSlopWhy = JSON.stringify(why);
+  } else {
+    delete post.dataset.dpSlopFams;
+    delete post.dataset.dpSlopWhy;
+  }
+  syncSlopChips(post);
 }
 
 // Fire-and-forget: any failure ({ok: false}, dead worker, timeout) means the
@@ -252,19 +315,24 @@ function queueJudge(post) {
     { type: DP_JUDGE_MSG, id: postIdentity(post), text: postBody(post) },
     (res) => {
       if (chrome.runtime.lastError || !res || !res.ok) return;
-      if (res.score >= JUDGE_CERTIFIED) certifySlop(post, res.offenses);
-      else if (res.score < JUDGE_CLEAR) clearSlop(post);
+      applyJudgeVerdict(post, res);
     },
   );
 }
 
+// The judge hears aggregate scores in the ambiguous band, plus promo
+// suspects below it (spec R9). Local convictions (≥70) are final.
+const judgeworthy = (score, promoSuspect) =>
+  (score >= SLOP_AMBIGUOUS || promoSuspect) && score < SLOP_LIKELY;
+
 function scoreSlopPost(post, hidden) {
   const body = postBody(post);
   if (!body) return;
-  const { score, families } = scoreSlop(body);
+  const { score, families, promoSuspect } = scoreSlop(body);
   post.dataset.dpSlopScore = score;
+  if (promoSuspect) post.dataset.dpSlopPromo = '1';
   if (families.length) applySlopFamilies(post, families);
-  if (score >= SLOP_AMBIGUOUS && score < SLOP_LIKELY && !hidden && dpFilters.slop) {
+  if (judgeworthy(score, promoSuspect) && !hidden && dpFilters.slop) {
     queueJudge(post);
   }
 }
@@ -276,7 +344,7 @@ function requeueAmbiguous() {
   for (const post of document.querySelectorAll('[data-dp-slop-score]')) {
     if ('dpJudged' in post.dataset || post.dataset.dpReasons) continue;
     const score = Number(post.dataset.dpSlopScore);
-    if (score >= SLOP_AMBIGUOUS && score < SLOP_LIKELY) queueJudge(post);
+    if (judgeworthy(score, 'dpSlopPromo' in post.dataset)) queueJudge(post);
   }
 }
 
@@ -319,9 +387,7 @@ function sweep() {
   // LinkedIn's renderer may reconcile away injected nodes; re-seed any
   // classified post whose placeholder or badge went missing.
   for (const post of document.querySelectorAll('[data-dp-reasons]')) {
-    if (!post.querySelector(':scope > .dp-placeholder')) {
-      post.prepend(buildPlaceholder(post, post.dataset.dpReasons.split(' ')));
-    }
+    if (!post.querySelector(':scope > .dp-placeholder')) syncPlaceholder(post);
   }
   for (const post of document.querySelectorAll('[data-dp-slop-fams]')) {
     if (!post.querySelector(':scope > .dp-slop-badge')) syncSlopChips(post);
@@ -345,14 +411,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // Inject per-filter hide/show rules — macro-expansions of DP_FILTERS, so the
-// CSS stays in sync with the filter list automatically.
+// CSS stays in sync with the filter list automatically. Slop-hide rows (R10)
+// target the badge channel (data-dp-slop-fams / -certified) instead of
+// data-dp-reasons; the hide/placeholder pair is otherwise identical.
+const dpRuleFor = (f) => {
+  if (f.mode === 'badge') {
+    return `html[data-dp-hide~="${f.key}"] [data-dp-slop-fams] > .dp-slop-badge { display: inline-flex !important; }`;
+  }
+  const target = f.mode === 'slophide'
+    ? (f.key === 'certified' ? '[data-dp-slop-certified]' : `[data-dp-slop-fams~="${f.key}"]`)
+    : `[data-dp-reasons~="${f.key}"]`;
+  return [
+    `html[data-dp-hide~="${f.key}"] ${target}:not([data-dp-revealed]) > :not(.dp-placeholder) { display: none !important; }`,
+    `html[data-dp-hide~="${f.key}"] ${target} > .dp-placeholder { display: flex !important; }`,
+  ].join('\n');
+};
 const dpStyle = document.createElement('style');
-dpStyle.textContent = DP_FILTERS.map((f) => (f.mode === 'badge'
-  ? `html[data-dp-hide~="${f.key}"] [data-dp-slop-fams] > .dp-slop-badge { display: inline-flex !important; }`
-  : [
-    `html[data-dp-hide~="${f.key}"] [data-dp-reasons~="${f.key}"]:not([data-dp-revealed]) > :not(.dp-placeholder) { display: none !important; }`,
-    `html[data-dp-hide~="${f.key}"] [data-dp-reasons~="${f.key}"] > .dp-placeholder { display: flex !important; }`,
-  ].join('\n'))).join('\n');
+dpStyle.textContent = DP_FILTERS.map(dpRuleFor).join('\n');
 document.documentElement.appendChild(dpStyle);
 
 let scheduled = false;

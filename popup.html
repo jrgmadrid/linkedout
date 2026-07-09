@@ -6,30 +6,56 @@
     body {
       margin: 0;
       width: 280px;
+      /* Chrome caps popups at 600px; capping here makes #sections the
+         scroller so the footer never drops below the fold. */
+      max-height: 600px;
+      display: flex;
+      flex-direction: column;
       font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: #1d2226;
-      background: #fff;
+      background: #fbfcfe;
+    }
+    main {
+      overflow-y: auto;
     }
     header {
-      padding: 12px 16px 8px;
+      padding: 14px 16px 2px;
       font-size: 14px;
       font-weight: 600;
+    }
+    h2, h3 {
+      margin: 14px 16px 2px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #5b6772;
+    }
+    h3 {
+      margin: 10px 16px 2px 30px;
     }
     ul {
       list-style: none;
       margin: 0;
-      padding: 0 8px 8px;
+      padding: 0 8px 4px;
+    }
+    ul.sub {
+      padding-left: 22px;
     }
     label {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px;
+      padding: 6px 8px;
       border-radius: 6px;
       cursor: pointer;
     }
     label:hover {
-      background: #f3f6f8;
+      background: #f2f5f8;
+    }
+    label:has(input:focus-visible) {
+      outline: 2px solid #0a66c2;
+      outline-offset: -2px;
     }
     input[type="checkbox"] {
       accent-color: #0a66c2;
@@ -40,15 +66,17 @@
     }
     small {
       display: block;
-      color: #666;
+      color: #5b6772;
       font-size: 11px;
     }
     footer {
+      flex-shrink: 0;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
-      padding: 8px 16px 12px;
-      border-top: 1px solid #e8e8e8;
+      padding: 10px 16px 12px;
+      border-top: 1px solid #e6eaef;
     }
     footer button {
       font: inherit;
@@ -65,15 +93,16 @@
     }
     #harvest-status {
       font-size: 11px;
-      color: #666;
+      color: #5b6772;
     }
   </style>
 </head>
 <body>
-  <header>Hide from feed</header>
-  <ul id="filters"></ul>
+  <header>Better LinkedIn</header>
+  <main id="sections"></main>
   <footer>
     <button id="harvest">Export feed markers</button>
+    <button id="reload" title="Reload the extension and refresh LinkedIn tabs">Reload</button>
     <span id="harvest-status"></span>
   </footer>
   <script src="filters.js"></script>

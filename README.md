@@ -15,6 +15,10 @@ button, so it's reversible). Click the toolbar icon to pick filters:
 - **News & games** — the "LinkedIn News" / "Today's puzzles" rail widgets
 - **Slop badge** (on by default) — engagement-bait posts stay visible but get
   a "Likely slop" pill; see below
+- **Chip hide filters** (off by default) — each chip (Broetry, Engagement
+  bait, Ad spam, Undisclosed promo, Certified slop) can also collapse its
+  posts behind a placeholder; judge-minted chips collapse when the verdict
+  lands
 
 ## How it works
 
@@ -45,9 +49,19 @@ aesthetic judgment about the text, deliberately **not** an "AI-generated"
 claim: a human-written hustle post earns its chips just fine. Signals group
 into three families, each rendering its own chip when it fires: **Broetry**
 (line-stacking, "It's not X, it's Y", em-dashes, buzzwords), **Engagement
-bait** ("Agree?", repost CTAs, hashtag walls), and **Ad spam** (ALL-CAPS
-shouting, link piles, contact blocks). A judge-confirmed post gains a filled
-**Certified slop** chip. Hover any chip for its itemized offense receipt.
+bait** ("Agree?", repost CTAs, hashtag walls, reach hacks like "link in the
+first comment", 𝗳𝗮𝗸𝗲-𝗯𝗼𝗹𝗱 Unicode styling), and **Ad spam** (ALL-CAPS
+shouting, link piles, contact blocks). Pseudo-bold text is also folded back
+to ASCII before scoring, so it can't smuggle buzzwords past the lexicons. A judge-confirmed post gains a filled **Certified slop** chip.
+Hover any chip for its itemized offense receipt.
+
+A fourth chip, **Undisclosed promo**, is minted only by the judge: promotion
+disguised as personal content or free value. Regex never convicts on intent —
+cheap promo markers ("register now", discount codes, launch phrasing) merely
+send a suspected post to the judge, who lets honest promotion walk: job
+posts, launch announcements, and event invites that say what they are keep
+their dignity. The verdict is independent of the slop score, so a
+well-written stealth ad wears the chip anyway.
 
 Two tiers, two brains:
 
@@ -55,8 +69,9 @@ Two tiers, two brains:
    post's commentary. Each family chips independently at its own points
    threshold; clearly fine posts are done.
 2. **LLM judge** (`worker.js`) — posts whose aggregate score lands in the
-   ambiguous middle band are sent to an OpenAI-compatible endpoint (DeepSeek
-   by default) from the background service worker. The judge can certify
+   ambiguous middle band (or that trip a promo marker below it) are sent to
+   an OpenAI-compatible endpoint (DeepSeek by default) from the background
+   service worker. The judge can certify
    (filled chip) or clear the heuristic chips outright — the mercy path for
    sincere posts that merely look like slop. Verdicts are cached per post,
    judged at most once, and every failure mode falls back to the heuristic

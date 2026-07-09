@@ -17,6 +17,7 @@ const signal = (key) => SLOP_SIGNALS.find((s) => s.key === key);
 const ctxFor = (text) => ({
   lines: text.split('\n').map((l) => l.trim()).filter(Boolean),
   words: text.split(/\s+/).filter(Boolean).length,
+  raw: text,
 });
 const hit = (key, text) => signal(key).detect(text, ctxFor(text));
 
@@ -60,6 +61,22 @@ check('linkpile -', hit('linkpile', 'Full write-up here: https://blog.example.co
 check('contactblock +', hit('contactblock', 'Great deals this month. Tel: (514) 695-9001 for a quote.') !== null);
 check('contactblock -', hit('contactblock', 'We shipped 514 units in Q3, up 9001 from the 695 baseline in 2026.') === null);
 
+check('commandbait say +', hit('commandbait', 'If you agree, say AMEN 🙏 Stay faithful.') !== null);
+check('commandbait vote +', hit('commandbait', 'AGREE ❤️ or DISAGREE 💔? Drop your take below.') !== null);
+check('commandbait emoji +', hit('commandbait', 'THIS 👇 👍/ 🔄 if you agree.') !== null);
+check('commandbait -', hit('commandbait', 'Readers will agree or disagree with the framework, and that is healthy.') === null);
+
+check('reachhack link +', hit('reachhack', 'Full breakdown is free. Link in the first comment!') !== null);
+check('reachhack dm +', hit('reachhack', 'DM me for the link and I will send it right over.') !== null);
+check('reachhack code +', hit('reachhack', 'Use code LAUNCH20 at checkout this week only.') !== null);
+check('reachhack -', hit('reachhack', 'I linked the docs in a comment yesterday; the code uses standard retries.') === null);
+
+const STYLED = '𝗗𝗼𝗻\'𝘁 𝘁𝗿𝘆 𝘁𝗼 𝘀𝗼𝘂𝗻𝗱 𝗶𝗺𝗽𝗿𝗲𝘀𝘀𝗶𝘃𝗲. 𝗕𝗲 𝗿𝗲𝗮𝗹, 𝘀𝗵𝗼𝘄 𝘆𝗼𝘂𝗿 𝘄𝗼𝗿𝗸, 𝗮𝗻𝗱 𝗹𝗲𝘁 𝘆𝗼𝘂𝗿 𝗽𝗿𝗼𝗷𝗲𝗰𝘁𝘀 𝘀𝗽𝗲𝗮𝗸 𝗳𝗼𝗿 𝘆𝗼𝘂.';
+check('fakebold +', hit('fakebold', STYLED) !== null);
+check('fakebold escalates on styled sentences', hit('fakebold', STYLED).points === 25);
+check('fakebold spares actual math', hit('fakebold', 'Let 𝑥 and 𝑦 be variables where 𝑥 + 𝑦 = 10 and 𝑥 > 0.') === null);
+check('fakebold -', hit('fakebold', PROSE) === null);
+
 check('rhetq +', hit('rhetq', 'Why? Because. Why not? Who knows? It works.') !== null);
 check('rhetq -', hit('rhetq', 'Anyone know a good fix for this? Happy to share details.') === null);
 
@@ -100,6 +117,75 @@ check('multi-family post fires multiple chips', famKeys(
 ).length >= 2);
 check('clean prose fires nothing', famKeys(PROSE).length === 0);
 check('family offenses carry receipts', scoreSlop(BROETRY).families[0].offenses[0].detail.length > 0);
+
+// ---- promotion (spec R9): suspicion widens the trigger, only the judge
+// ---- convicts --------------------------------------------------------------
+
+console.log('promo (R9):');
+check('promotion family is declared', SLOP_FAMILIES.some((f) => f.key === 'promotion'));
+check('no heuristic signal maps to promotion', SLOP_SIGNALS.every((s) => s.family !== 'promotion'));
+
+const PROMO = PROSE + ' Register now to save your seat, this free webinar covers all of it.';
+check('promo markers set promoSuspect', scoreSlop(PROMO).promoSuspect === true);
+check('markers alone score nothing', scoreSlop(PROMO).score === 0);
+check('clean prose is not promo-suspect', scoreSlop(PROSE).promoSuspect === false);
+check('short posts are never promo-suspect', scoreSlop('Register now!').promoSuspect === false);
+
+const HIRING = 'We are hiring two senior backend engineers for our payments team in Vancouver. '
+  + 'Hybrid, base range posted in the listing. If the work sounds interesting, apply '
+  + 'through the careers page or reach out directly and I will route you.';
+check('hiring posts are not promo-suspect', scoreSlop(HIRING).promoSuspect === false);
+
+// Widened 2026-07-06 (decision: maintainer, stricter): free-value funnels with an
+// intervening noun, scarcity counts, and DM-availability all earn a hearing.
+const FUNNEL = 'Update on free resume reviews. I have three remaining spots open this week. '
+  + 'Having trouble securing interviews? The number one reason is your resume. '
+  + 'My DMs are open, they are always open.';
+check('free-noun funnel is promo-suspect', scoreSlop(FUNNEL).promoSuspect === true);
+check('DM-availability is promo-suspect', scoreSlop(PROSE + ' My DMs are always open.').promoSuspect === true);
+check('scarcity count is promo-suspect', scoreSlop(PROSE + ' Only three spots left for this cohort.').promoSuspect === true);
+
+check('reach hack alone fires the bait chip',
+  famKeys(PROSE + ' Link in the first comment.').includes('bait'));
+
+// ---- word floor (amended 2026-07-03): mechanics pierce it, rhythm doesn't --
+
+console.log('word floor:');
+check('bait mechanics pierce the floor',
+  famKeys('If you agree, say AMEN 🙏 Stay faithful.').includes('bait'));
+check('sub-floor soft closer escalates to a chip',
+  famKeys('AI is just a machine. Agree?').includes('bait'));
+check('short reach hack chips',
+  famKeys('Use code LUX20 at checkout today!').includes('bait'));
+check('earnest short agreement stays clean',
+  famKeys("Couldn't agree more with this take.").length === 0);
+check('above-floor soft closer stays at 12 pts',
+  !famKeys(PROSE + ' Thoughts?').includes('bait'));
+check('rhythm signals still floored',
+  famKeys('Win.\n\nGrind.\n\nRepeat.\n\nEvery day.\n\nNo excuses.\n\nStay hungry.').length === 0);
+
+// ---- NFKC unmasking: styled text can't hide from the lexicons -------------
+
+console.log('unicode costume:');
+check('styled sentence chips as bait through the floor', famKeys(STYLED).includes('bait'));
+check('NFKC unmasks buzzwords under pseudo-bold',
+  scoreSlop(PROSE + ' This is a 𝗴𝗮𝗺𝗲-𝗰𝗵𝗮𝗻𝗴𝗲𝗿 for your 𝗽𝗲𝗿𝘀𝗼𝗻𝗮𝗹 𝗯𝗿𝗮𝗻𝗱. Read that again.')
+    .offenses.some((o) => o.label === 'Buzzword lexicon'));
+
+// ---- registry (spec R10): slop-hide rows ↔ chips stay in lockstep ---------
+
+console.log('registry:');
+const { DP_FILTERS, DP_SECTIONS } = require('../filters.js');
+const sectionKeys = new Set(DP_SECTIONS.map((s) => s.key));
+check('every filter row belongs to a declared section',
+  DP_FILTERS.every((f) => sectionKeys.has(f.section)));
+check('no declared section is empty',
+  DP_SECTIONS.every((s) => DP_FILTERS.some((f) => f.section === s.key)));
+const chipKeys = new Set([...SLOP_FAMILIES.map((f) => f.key), 'certified']);
+const slopHideRows = DP_FILTERS.filter((f) => f.mode === 'slophide');
+check('every slop-hide row targets a real chip', slopHideRows.every((f) => chipKeys.has(f.key)));
+check('every chip has a slop-hide row', [...chipKeys].every((k) => slopHideRows.some((f) => f.key === k)));
+check('slop-hide rows default off', slopHideRows.every((f) => f.enabled === false));
 
 // ---- eval-set calibration (T4 fixtures) -----------------------------------
 

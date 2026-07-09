@@ -141,6 +141,13 @@ html[data-theme="dark"] .dp-placeholder button:hover {
   color: #99331a;
 }
 
+/* Judge-minted only (spec R9): money-green for the stealth ad. */
+.dp-slop-chip[data-fam="promotion"] {
+  background: rgba(20, 110, 80, 0.1);
+  border-color: rgba(20, 110, 80, 0.55);
+  color: #0e6e4c;
+}
+
 /* Judge-confirmed: filled, unmissable. */
 .dp-slop-chip[data-fam="certified"] {
   background: #99331a;
@@ -167,6 +174,13 @@ html[data-theme="dark"] .dp-slop-chip[data-fam="ad"] {
   background: rgba(241, 106, 71, 0.16);
   border-color: rgba(241, 106, 71, 0.5);
   color: #f28b6f;
+}
+
+[data-color-scheme="dark"] .dp-slop-chip[data-fam="promotion"],
+html[data-theme="dark"] .dp-slop-chip[data-fam="promotion"] {
+  background: rgba(72, 187, 138, 0.16);
+  border-color: rgba(72, 187, 138, 0.45);
+  color: #6fcfa4;
 }
 
 [data-color-scheme="dark"] .dp-slop-chip[data-fam="certified"],

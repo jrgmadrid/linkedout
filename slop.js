@@ -9,9 +9,12 @@
 // specs/001-slop-badge/eval/ (test/slop.test.js); tune there, not by vibes.
 
 const SLOP_FAMILIES = [
-  { key: 'broetry', label: 'Broetry' },
-  { key: 'bait',    label: 'Engagement bait' },
-  { key: 'ad',      label: 'Ad spam' },
+  { key: 'broetry',   label: 'Broetry' },
+  { key: 'bait',      label: 'Engagement bait' },
+  { key: 'ad',        label: 'Ad spam' },
+  // Judge-minted only (spec R9): no signal maps here, so scoreSlop
+  // structurally cannot fire it — regex never convicts on intent.
+  { key: 'promotion', label: 'Undisclosed promo' },
 ];
 
 const SLOP_FAMILY_THRESHOLD = 20;
@@ -25,6 +28,34 @@ const SLOP_BAIT_HARD =
   /let that sink in|who['’]?s with me|repost (?:if|this|to)|follow (?:me )?for more|share (?:if|this)|♻️|comment ["“']?\w+["”']? below/gi;
 const SLOP_BAIT_SOFT =
   /\b(?:agree|thoughts|what do you think)\s*\?/gi;
+
+// Command/vote bait (harvest v6-2 misses): ordering readers to perform
+// agreement — "if you agree, say AMEN", "AGREE ❤️ or DISAGREE 💔?",
+// reaction-emoji CTAs ("👍/🔄 if you agree"). The vote form requires the
+// question mark so "people will agree or disagree" discourse walks.
+const SLOP_COMMAND_BAIT =
+  /\bif you agree,? *(?:say|type|drop|comment|hit|smash)\b|\bagree\b[^\n]{0,8}\bor\b[^\n]{0,8}\bdisagree\b[^\n]{0,8}\?|(?:👍|🔄|♻️|❤️|🔥|💯)[\s/+|]*(?:👍|🔄|♻️|❤️|🔥|💯)*\s*if you (?:agree|relate|believe)/gi;
+
+// Mathematical Alphanumeric Symbols (U+1D400–1D7FF) abused as pseudo-bold/
+// italic — a pure attention hack that also breaks screen readers. A run of
+// ≥3 means a styled word; single chars are spared so actual math posts
+// ("let 𝑥 be…") walk. Detected on the RAW text; everything else scores the
+// NFKC-normalized text so the costume can't hide buzzwords from the lexicons.
+const SLOP_STYLED_RUN = /[\u{1D400}-\u{1D7FF}]{3,}/gu;
+
+// Mechanical reach-hacks: gaming the algorithm is bait by definition, no
+// intent judgment needed. "Link in the first comment" dodges the external-
+// link penalty; DM-gating trades access for engagement.
+const SLOP_REACH_HACK =
+  /\blink (?:is |will be )?in (?:the )?(?:first |1st )?comments?\b|\bdm me for (?:the )?(?:link|details|access|info)\b|\buse (?:promo )?code\s+[A-Za-z0-9]+/gi;
+
+// Promo-suspicion markers (spec R9). Zero points, no family: promotion is an
+// intent judgment and regex never convicts — a hit only widens the judge
+// trigger, and the judge walks honest promotion (job posts, launches, event
+// invites that say what they are). No bare price mentions: salary-
+// transparency and funding posts would drown the trigger.
+const SLOP_PROMO_MARKERS =
+  /register (?:now|today|here)|sign up (?:now|today|here)|book a (?:call|demo)|save your (?:seat|spot)|limited (?:seats|spots)|early[- ]bird|\d+% off|free (?:[a-z]+ )?(?:trials?|webinars?|masterclass(?:es)?|workshops?|ebooks?|guides?|templates?|reviews?|audits?|consultations?|sessions?|coaching|calls?|checklists?)|(?:just|excited to|thrilled to|proud to) launch(?:ed)?\b|now live on|link in bio|waitlist is open|dms? (?:are )?(?:always )?open|(?:\d+|a few|two|three|four|five) (?:remaining )?(?:spots?|slots?|seats?)\b|spots? (?:are )?(?:open|left|remaining|available)|all spots? claimed/i;
 
 const SLOP_EMOJI_BULLET =
   /^[\s]*[✅❌➡️👉🔥🚀💡✨📌📈🎯🧵→•·▪️◾️]/u;
@@ -68,14 +99,29 @@ const SLOP_SIGNALS = [
   {
     key: 'baitcloser',
     family: 'bait',
+    floorExempt: true,
     label: 'Engagement-bait closer',
-    detect: (text) => {
+    detect: (text, ctx) => {
       const tail = text.slice(-220);
       const hard = tail.match(SLOP_BAIT_HARD) || [];
       const soft = tail.match(SLOP_BAIT_SOFT) || [];
       if (!hard.length && !soft.length) return null;
-      const points = Math.min(20 * hard.length + 12 * soft.length, 35);
+      // Under the word floor the soft closer IS the payload: a sub-25-word
+      // "Agree?" post is a vote farm, not a question.
+      const softPts = ctx.words < 25 ? 20 : 12;
+      const points = Math.min(20 * hard.length + softPts * soft.length, 35);
       return { points, detail: (hard[0] || soft[0]).trim() };
+    },
+  },
+  {
+    key: 'commandbait',
+    family: 'bait',
+    floorExempt: true,
+    label: 'Command/vote bait',
+    detect: (text) => {
+      const hits = text.match(SLOP_COMMAND_BAIT) || [];
+      if (!hits.length) return null;
+      return { points: Math.min(20 * hits.length, 35), detail: `"${hits[0].trim()}"` };
     },
   },
   {
@@ -146,6 +192,28 @@ const SLOP_SIGNALS = [
     },
   },
   {
+    key: 'fakebold',
+    family: 'bait',
+    floorExempt: true,
+    label: 'Fake-bold styling',
+    detect: (text, ctx) => {
+      const runs = ctx.raw.match(SLOP_STYLED_RUN) || [];
+      if (!runs.length) return null;
+      return { points: runs.length >= 3 ? 25 : 15, detail: `${runs.length} styled word${runs.length > 1 ? 's' : ''}` };
+    },
+  },
+  {
+    key: 'reachhack',
+    family: 'bait',
+    floorExempt: true,
+    label: 'Reach hack',
+    detect: (text) => {
+      const hits = text.match(SLOP_REACH_HACK) || [];
+      if (!hits.length) return null;
+      return { points: Math.min(20 * hits.length, 35), detail: `"${hits[0].trim()}"` };
+    },
+  },
+  {
     key: 'hashtags',
     family: 'bait',
     label: 'Hashtag pileup',
@@ -158,16 +226,23 @@ const SLOP_SIGNALS = [
 ];
 
 function scoreSlop(text) {
+  // Unmask pseudo-bold before scoring (NFKC folds math alphanumerics to
+  // ASCII); the raw text rides along in ctx for the styling signal itself.
+  const raw = text;
+  text = text.normalize('NFKC');
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const words = text.split(/\s+/).filter(Boolean).length;
-  // Too short to have a rhythm — one-liners can't be slop, only wrong.
-  if (words < 25) return { score: 0, offenses: [], families: [] };
+  // Rhythm signals need length to mean anything, so the word floor guards
+  // them — but bait mechanics convict at any size ("say AMEN if you agree"
+  // is a complete crime at eight words). floorExempt signals always run.
+  const underFloor = words < 25;
 
-  const ctx = { lines, words };
+  const ctx = { lines, words, raw };
   const offenses = [];
   const perFamily = {};
   let score = 0;
   for (const s of SLOP_SIGNALS) {
+    if (underFloor && !s.floorExempt) continue;
     const hit = s.detect(text, ctx);
     if (!hit) continue;
     score += hit.points;
@@ -191,6 +266,7 @@ function scoreSlop(text) {
     score: Math.min(100, score),
     offenses: offenses.map(({ label, detail }) => ({ label, detail })),
     families,
+    promoSuspect: !underFloor && SLOP_PROMO_MARKERS.test(text),
   };
 }
 

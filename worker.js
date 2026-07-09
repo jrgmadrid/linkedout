@@ -17,6 +17,8 @@ try {
   // no-op — heuristics-only mode
 }
 
+const JUDGE_FAMILIES = new Set(['broetry', 'bait', 'ad', 'promotion']);
+
 const CACHE_KEY = 'dpSlopCache';
 const CACHE_MAX = 2000;
 const MAX_CONCURRENT = 2;
@@ -27,9 +29,13 @@ High-slop signals: broetry (stacked one-sentence paragraphs for fake gravitas), 
 
 Low-slop signals: specific concrete detail, genuine information density, natural paragraph rhythm, the author saying something they could be wrong about.
 
+Separately, flag undisclosed promotion: an ad presenting itself as personal content or free value — a manufactured story that resolves into a pitch, a "free" webinar/guide/masterclass funnel, a product plug dressed as a lesson learned. A free offer wrapped in fear hooks ("your resume is failing you"), manufactured scarcity ("3 spots left"), or a DM-funnel close is promotion disguised as generosity — the freebie being real does not clear it. Promotion honestly being promotion is NOT an offense: job posts, launch announcements, and event invites that say what they are walk. Undisclosed promotion is independent of the score — a well-written stealth ad keeps a low score and still gets a "promotion" offense.
+
 Score 0-100 (0 = genuine writing, 100 = certified slop). Sincere but plainly-written posts (job news, grief, personal milestones) are NOT slop — style alone doesn't convict; the tells above must actually be present.
 
-Respond with strict JSON: {"score": <0-100>, "offenses": [{"label": "<short name>", "detail": "<specific evidence, quoted if possible>"}]} with at most 4 offenses, worst first. Empty offenses array if score < 40.`;
+Family guide: "broetry" = performative prose mechanics; "bait" = engagement mechanics (closers, hooks, vote-farming); "ad" = formatting spam (shouting, link piles, contact blocks); "promotion" = ANY disguised-promotion offense, including free-value funnels — when in doubt between "ad" and "promotion", disguise means "promotion".
+
+Respond with strict JSON: {"score": <0-100>, "offenses": [{"family": "<broetry|bait|ad|promotion>", "label": "<short name>", "detail": "<specific evidence, quoted if possible>"}]} with at most 4 offenses, worst first. Empty offenses array if score < 40 and no undisclosed promotion found.`;
 
 async function callJudge(text) {
   const res = await fetch(`${judge.base}/chat/completions`, {
@@ -45,10 +51,14 @@ async function callJudge(text) {
         { role: 'user', content: text.slice(0, 4000) },
       ],
       response_format: { type: 'json_object' },
-      max_tokens: 250,
+      // deepseek-v4-flash reasons before answering, and reasoning spends
+      // from this same budget — at 250 it routinely emitted zero content
+      // (finish_reason: length, probed 2026-07-04). The verdict JSON itself
+      // is ~120 tokens; the rest is thinking room.
+      max_tokens: 1500,
       temperature: 0,
     }),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`judge HTTP ${res.status}`);
   const data = await res.json();
@@ -57,10 +67,15 @@ async function callJudge(text) {
   const score = Math.max(0, Math.min(100, Math.round(Number(verdict.score) || 0)));
   const offenses = (Array.isArray(verdict.offenses) ? verdict.offenses : [])
     .slice(0, 4)
-    .map((o) => ({
-      label: String(o.label || '').slice(0, 60),
-      detail: String(o.detail || '').slice(0, 120),
-    }));
+    .map((o) => {
+      const offense = {
+        label: String(o.label || '').slice(0, 60),
+        detail: String(o.detail || '').slice(0, 120),
+      };
+      // Invalid family → field omitted → never mints a chip (spec R9).
+      if (JUDGE_FAMILIES.has(o.family)) offense.family = o.family;
+      return offense;
+    });
   return { score, offenses };
 }
 
@@ -122,4 +137,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== DP_JUDGE_MSG) return;
   verdictFor(msg.id, msg.text).then(sendResponse, () => sendResponse({ ok: false }));
   return true;
+});
+
+// Dev loop: reloading the extension (popup button or chrome://extensions)
+// leaves stale content scripts in open tabs — they only re-inject on tab
+// load. The fresh worker boots with onInstalled, so refresh LinkedIn tabs
+// here and the new scripts arrive without touching the browser. Reason is
+// gated so a browser update doesn't yank tabs out from under the user.
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason !== 'install' && reason !== 'update') return;
+  chrome.tabs.query({ url: 'https://www.linkedin.com/*' }, (tabs) => {
+    for (const tab of tabs) chrome.tabs.reload(tab.id);
+  });
 });
