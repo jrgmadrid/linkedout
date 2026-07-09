@@ -30,36 +30,74 @@ function buildRow(f) {
   return li;
 }
 
+// Groups of two or more rows get a header checkbox that toggles the whole
+// group; indeterminate shows a mixed state. A group of one would just be
+// the row's own toggle wearing a hat, so it gets a plain heading.
+function buildHeading(tag, title, rows) {
+  const h = document.createElement(tag);
+  if (rows.length < 2) {
+    h.textContent = title;
+    return h;
+  }
+  const lbl = document.createElement('label');
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.dataset.groupKeys = rows.map((f) => f.key).join(' ');
+  lbl.append(box, document.createTextNode(title));
+  h.appendChild(lbl);
+  return h;
+}
+
 const main = document.getElementById('sections');
 for (const g of GROUPS) {
   const section = document.createElement('section');
-  const h2 = document.createElement('h2');
-  h2.textContent = g.title;
   const ul = document.createElement('ul');
   for (const f of g.rows) ul.appendChild(buildRow(f));
-  section.append(h2, ul);
+  section.append(buildHeading('h2', g.title, g.rows), ul);
   if (g.sub) {
-    const h3 = document.createElement('h3');
-    h3.textContent = g.sub.title;
     const subUl = document.createElement('ul');
     subUl.className = 'sub';
     for (const f of g.sub.rows) subUl.appendChild(buildRow(f));
-    section.append(h3, subUl);
+    section.append(buildHeading('h3', g.sub.title, g.sub.rows), subUl);
   }
   main.appendChild(section);
 }
 
 const checkboxes = document.querySelectorAll('input[data-filter]');
+const rowBox = (key) => document.querySelector(`input[data-filter="${key}"]`);
+
+function syncGroupBoxes() {
+  for (const box of document.querySelectorAll('input[data-group-keys]')) {
+    const kids = box.dataset.groupKeys.split(' ').map(rowBox);
+    const on = kids.filter((k) => k.checked).length;
+    box.checked = on === kids.length;
+    box.indeterminate = on > 0 && on < kids.length;
+  }
+}
 
 chrome.storage.sync.get(DP_DEFAULTS, (filters) => {
   for (const box of checkboxes) {
     box.checked = filters[box.dataset.filter];
   }
+  syncGroupBoxes();
 });
 
 for (const box of checkboxes) {
   box.addEventListener('change', () => {
     chrome.storage.sync.set({ [box.dataset.filter]: box.checked });
+    syncGroupBoxes();
+  });
+}
+
+for (const box of document.querySelectorAll('input[data-group-keys]')) {
+  box.addEventListener('change', () => {
+    const updates = {};
+    for (const key of box.dataset.groupKeys.split(' ')) {
+      rowBox(key).checked = box.checked;
+      updates[key] = box.checked;
+    }
+    chrome.storage.sync.set(updates);
+    syncGroupBoxes();
   });
 }
 
