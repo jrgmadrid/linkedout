@@ -62,9 +62,11 @@ const SLOP_EMOJI_BULLET =
 
 // "It's not X, it's Y" and kin — the load-bearing rhetorical tic of the
 // genre, in present ("it's not about X, it's about Y") and past tense
-// ("wasn't about X. It was about Y").
+// ("wasn't about X. It was about Y"). The last alternative catches noun
+// subjects ("Project management is not task management. It is tension
+// management.") — calibrated from the 2026-07-08 eval labels.
 const SLOP_NOT_BUT =
-  /\b(?:it|this|that)['’]?s not (?:just |only |about )?[^.!?\n]{2,60}?[.,;—–-] *(?:it|this|that)['’]?s\b|\bnot because [^.!?\n]{2,60}?, but because\b|\b(?:is|was|are|were)n['’]?t (?:just |only )?about [^.!?\n]{2,60}?[.!?;,—–-] *(?:it|this|that|they)(?:['’]s|['’]re| was| is| were)[^.!?\n]{0,40}?\babout\b/gi;
+  /\b(?:it|this|that)['’]?s not (?:just |only |about )?[^.!?\n]{2,60}?[.,;—–-] *(?:it|this|that)['’]?s\b|\bnot because [^.!?\n]{2,60}?, but because\b|\b(?:is|was|are|were)n['’]?t (?:just |only )?about [^.!?\n]{2,60}?[.!?;,—–-] *(?:it|this|that|they)(?:['’]s|['’]re| was| is| were)[^.!?\n]{0,40}?\babout\b|\b[\w'’ -]{2,30} (?:is|are) not [\w'’ -]{2,40}[.,;:—–-]\s*(?:it|this|that|they) (?:is|are)\b/gi;
 
 const SLOP_SIGNALS = [
   {

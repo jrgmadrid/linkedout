@@ -32,7 +32,9 @@ check('broetry -', hit('broetry', PROSE) === null);
 
 check('notbut +', hit('notbut', "It's not about the money, it's about the mission.") !== null);
 check('notbut past +', hit('notbut', "The biggest AI deal this week wasn't about AI. It was about plumbing.") !== null);
+check('notbut noun subject +', hit('notbut', 'Project management is not task management. It is tension management.') !== null);
 check('notbut -', hit('notbut', 'The refactor was not what we planned but it worked out.') === null);
+check('notbut noun subject -', hit('notbut', 'The fix is not complete yet but the tests already pass locally.') === null);
 check('notbut past -', hit('notbut', "The outage wasn't about capacity. It turned out the failover config had drifted.") === null);
 
 const BULLETS = '✅ First thing\n✅ Second thing\n🚀 Third thing\nplus a normal line';
