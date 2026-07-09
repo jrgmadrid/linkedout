@@ -1,4 +1,4 @@
-# Better LinkedIn
+# LinkedOut
 
 Chrome extension (Manifest V3) that hides promoted posts, social-graph noise,
 and reposts from the LinkedIn feed. Filtered posts collapse into a native-

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Better LinkedIn",
+  "name": "LinkedOut",
   "version": "2.0.0",
   "description": "Filters the LinkedIn feed: promoted posts, social spillover, reposts, and more.",
   "icons": {
@@ -21,7 +21,7 @@
       "48": "icons/icon48.png"
     },
     "default_popup": "popup.html",
-    "default_title": "Better LinkedIn"
+    "default_title": "LinkedOut"
   },
   "content_scripts": [
     {
