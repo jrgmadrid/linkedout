@@ -107,6 +107,6 @@ document.getElementById('reload').addEventListener('click', () => {
   chrome.runtime.reload();
 });
 
-document.getElementById('judge-cfg').addEventListener('click', () => {
+document.getElementById('settings').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });

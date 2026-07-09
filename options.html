@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>LinkedOut — judge settings</title>
+  <title>LinkedOut — advanced settings for weirdos</title>
   <style>
     body {
       margin: 0;
@@ -17,10 +17,12 @@
       font-size: 15px;
       font-weight: 600;
     }
-    h1.section {
-      margin-top: 28px;
+    h2 {
+      margin: 28px 0 4px;
       padding-top: 16px;
       border-top: 1px solid #e6eaef;
+      font-size: 13px;
+      font-weight: 600;
     }
     p.lede {
       margin: 0 0 18px;
@@ -89,10 +91,15 @@
   </style>
 </head>
 <body>
-  <h1>Judge settings</h1>
-  <p class="lede">The LLM judge is optional and BYOK. Your key is stored in
-  this browser only (chrome.storage.local, never synced) and is used solely
-  by the extension's background worker.</p>
+  <h1>Advanced settings for weirdos</h1>
+  <p class="lede">None of this is required — the extension filters fine out
+  of the box. Everything below is for people who want a second opinion from
+  a language model, or who re-tune regexes for fun.</p>
+
+  <h2>LLM judge</h2>
+  <p class="lede">Optional and BYOK. Your key is stored in this browser only
+  (chrome.storage.local, never synced) and is used solely by the extension's
+  background worker.</p>
 
   <label for="apiKey">API key</label>
   <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="sk-…">
@@ -114,7 +121,7 @@
     <span id="status"></span>
   </div>
 
-  <h1 class="section">Advanced settings for weirdos</h1>
+  <h2>Feed forensics</h2>
   <p class="lede">When LinkedIn shuffles its DOM and a filter quietly stops
   matching, export fresh feed markers and re-tune the selectors against
   them. Dumps a JSON of the current feed's structure to Downloads; post
