@@ -58,26 +58,52 @@ function postAuthor(post) {
   return el ? el.getAttribute('aria-label').slice(AUTHOR_LABEL_PREFIX.length).trim() : null;
 }
 
-const reasonLabels = (keys) =>
-  keys.map((k) => REASON_LABEL_MAP[k]).filter(Boolean).join(', ');
+// The placeholder names the specific noise, not just "post": the noun comes
+// from the highest-priority reason, `who` is the responsible party (the
+// surfacing connection when there is one, else the author), and the byline
+// credits the original poster when that's a different person. Labels the
+// noun fully subsumes ("Reaction spillover" under "Hidden reaction") are
+// dropped; the rest ("Fig-leaf repost", slop families) stay as receipts.
+const PLACEHOLDER_NOUNS = {
+  promoted: 'ad', reactions: 'reaction', comments: 'comment', follows: 'follow',
+  reposts: 'repost', figleaf: 'repost', suggested: 'suggested post',
+  promotion: 'promo', broetry: 'slop', bait: 'slop', ad: 'slop', certified: 'slop',
+};
+const NOUN_SAYS_IT_ALL = new Set(['promoted', 'reactions', 'comments', 'follows', 'reposts', 'suggested']);
 
-function buildPlaceholder(post, keys) {
+function placeholderText(post) {
+  const keys = placeholderKeys(post);
+  const noun = PLACEHOLDER_NOUNS[keys[0]] || 'post';
+  const who = post.dataset.dpWho || postAuthor(post);
+  const original = postAuthor(post);
+  const byline = [];
+  if (post.dataset.dpWho && original && original !== post.dataset.dpWho) {
+    byline.push(`post by ${original}`);
+  }
+  byline.push(...keys.filter((k) => !NOUN_SAYS_IT_ALL.has(k))
+    .map((k) => REASON_LABEL_MAP[k]).filter(Boolean));
+  return {
+    title: who ? `Hidden ${noun} from ${who}` : `Hidden ${noun}`,
+    byline: byline.join(' · '),
+  };
+}
+
+function buildPlaceholder(post) {
   const box = document.createElement('div');
   box.className = 'dp-placeholder';
-  const labels = reasonLabels(keys);
   box.innerHTML = `
     ${EYE_OFF_ICON}
-    <span class="dp-placeholder-text"><span class="dp-title"></span><small>${labels}</small></span>
+    <span class="dp-placeholder-text"><span class="dp-title"></span><small></small></span>
     <button type="button"></button>`;
 
   const title = box.querySelector('.dp-title');
+  const small = box.querySelector('small');
   const button = box.querySelector('button');
-  const author = post.dataset.dpWho || postAuthor(post);
   const sync = () => {
     const revealed = 'dpRevealed' in post.dataset;
-    title.textContent = revealed
-      ? 'Post shown'
-      : author ? `Hidden post from ${author}` : 'Hidden post';
+    const text = placeholderText(post);
+    title.textContent = revealed ? 'Post shown' : text.title;
+    small.textContent = text.byline;
     button.textContent = revealed ? 'Hide' : 'Show';
   };
   sync();
@@ -214,21 +240,30 @@ const slopReceipt = (offenses) => offenses
 
 const slopFams = (post) => (post.dataset.dpSlopFams || '').split(' ').filter(Boolean);
 
-// The placeholder is the single statement of every reason a post can be
-// hidden: hide-filter reasons plus slop chips (spec R10). Built on first
-// need, labels refreshed as verdicts change; the reveal button reads live
-// post state, so a label update never touches it.
-function syncPlaceholder(post) {
+// Every reason a post can be hidden, priority-ordered: hide-filter reasons
+// first (classify order), then slop chips, then the judge's certification.
+function placeholderKeys(post) {
   const keys = (post.dataset.dpReasons || '').split(' ').filter(Boolean).concat(slopFams(post));
   if ('dpSlopCertified' in post.dataset) keys.push('certified');
+  return keys;
+}
+
+// The placeholder is the single statement of every reason a post can be
+// hidden (spec R10). Built on first need, text refreshed as judge verdicts
+// change the key set; a revealed post keeps its "Post shown" title.
+function syncPlaceholder(post) {
   const ph = post.querySelector(':scope > .dp-placeholder');
-  if (!keys.length) {
+  if (!placeholderKeys(post).length) {
     if (ph) ph.remove();
-  } else if (!ph) {
-    post.prepend(buildPlaceholder(post, keys));
-  } else {
-    ph.querySelector('small').textContent = reasonLabels(keys);
+    return;
   }
+  if (!ph) {
+    post.prepend(buildPlaceholder(post));
+    return;
+  }
+  const text = placeholderText(post);
+  if (!('dpRevealed' in post.dataset)) ph.querySelector('.dp-title').textContent = text.title;
+  ph.querySelector('small').textContent = text.byline;
 }
 
 function slopChip(fam, label, title) {
