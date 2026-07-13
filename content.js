@@ -61,13 +61,14 @@ function postAuthor(post) {
 // The placeholder names the specific noise, not just "post": the noun comes
 // from the highest-priority reason, `who` is the responsible party (the
 // surfacing connection when there is one, else the author), and the byline
-// credits the original poster when that's a different person. Labels the
+// credits the original poster when that's a different person. Nouns are
+// reserved for observable mechanics; verdicts (slop families, promotion)
+// stay in the byline, where "Broetry" reads as the claim it is. Labels the
 // noun fully subsumes ("Reaction spillover" under "Hidden reaction") are
-// dropped; the rest ("Fig-leaf repost", slop families) stay as receipts.
+// dropped; the rest stay as receipts.
 const PLACEHOLDER_NOUNS = {
   promoted: 'ad', reactions: 'reaction', comments: 'comment', follows: 'follow',
   reposts: 'repost', figleaf: 'repost', suggested: 'suggested post',
-  promotion: 'promo', broetry: 'slop', bait: 'slop', ad: 'slop', certified: 'slop',
 };
 const NOUN_SAYS_IT_ALL = new Set(['promoted', 'reactions', 'comments', 'follows', 'reposts', 'suggested']);
 
