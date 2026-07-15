@@ -59,9 +59,11 @@ const DP_PROMOTED_PATTERN =
 // Fig-leaf commentary: a generic reaction pasted on a repost — agreement
 // without perspective. Anchored against normalized text so "This." convicts
 // and "This is why X fails" walks; the one non-anchored idiom ("couldn't
-// agree more") survives a leading "💯 <name>" prefix. Deliberately
-// precision-first: a missed fig leaf costs feed space, a false hide costs
-// the user a click on the placeholder.
+// agree more") survives a leading "💯 <name>" prefix. In a plugin that
+// otherwise leans recall, the anchors and the adversative exception below
+// are a deliberate concession: on the off-chance the reposter smuggled an
+// actual thought into the commentary, the repost lives. The target is
+// agreement without perspective, never reposting itself.
 const DP_FIGLEAF_MAX_WORDS = 15;
 // An adversative after the agreement ("Agree, but the third point misses…")
 // signals actual perspective, so those walk.
