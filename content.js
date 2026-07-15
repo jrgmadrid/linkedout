@@ -1,6 +1,8 @@
 // Detection is calibrated against LinkedIn's 2026 frontend (hashed CSS-module
-// classes, componentkey attributes), with the classic-DOM selectors kept as
-// fallback since LinkedIn A/B tests rendering stacks.
+// classes, componentkey attributes), with the classic-DOM selectors kept
+// because whole surfaces still run that stack: profile activity pages and
+// post permalinks render classic .feed-shared-update-v2 roots, while the
+// feed, search results, and profile-page modules run the new stack.
 //
 // Signals, in order of durability:
 // 1. Promoted: [aria-label="View Sponsored Content"] — an accessibility
@@ -19,8 +21,13 @@
 // data-dp-slop instead of data-dp-reasons, and the generated CSS shows a
 // pill on the still-visible post rather than collapsing it.
 
+// Post roots across surfaces: the new stack renders div[role=listitem]
+// everywhere but keys them differently — feed and search posts carry
+// expanded<tok>FeedType componentkeys, profile-page modules bare UUIDs — so
+// role alone is the selector and the control-menu gate in sweep() decides
+// posthood. Classic surfaces (activity pages, permalinks) keep their roots.
 const POST_SELECTOR = [
-  'div[role="listitem"][componentkey*="FeedType"]',
+  'div[role="listitem"]',
   'div[data-id^="urn:li:activity"]',
   'div.feed-shared-update-v2',
 ].join(', ');
@@ -413,10 +420,13 @@ function sweep() {
   sweepWidgets();
   for (const post of document.querySelectorAll(POST_SELECTOR)) {
     if (post.dataset.dpChecked) continue;
-    // Hydration gate: every fully-rendered post carries an "Open control menu
-    // for post by …" aria-label; skeletons don't. Skipping without stamping
-    // lets the MutationObserver naturally re-examine on the next mutation.
-    if (!post.querySelector('[aria-label*="control menu"]')) continue;
+    // Hydration-and-posthood gate: every fully-rendered post carries an
+    // "Open control menu for post by …" aria-label; skeletons don't, and
+    // neither do the non-post listitems the broad selector now admits
+    // (profile cards, comments — whose menus say "Control Menu Options").
+    // Skipping without stamping lets the MutationObserver naturally
+    // re-examine on the next mutation.
+    if (!post.querySelector(`[aria-label^="${AUTHOR_LABEL_PREFIX}"]`)) continue;
     post.dataset.dpChecked = '1';
     const { reasons, who } = classify(post);
     if (reasons.length) {
